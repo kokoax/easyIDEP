@@ -1,0 +1,13 @@
+[package]
+name = "easyIDEP"
+version = "0.1.0"
+authors = ["kokoax <yomo4808@gmail.com>"]
+
+[dependencies]
+regex = "0.2"
+gdk="0.5.0"
+
+[dependencies.gtk]
+version = "0.1.2"
+features = ["v3_16"]
+
