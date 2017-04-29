@@ -1,2 +1,4 @@
-print("Hello, World!");
+def main():
+	print("sample")
 
+main()
