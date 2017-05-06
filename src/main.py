@@ -1,4 +1,1 @@
-def main():
-	print("sample")
-
-main()
+print("OK")

@@ -4,22 +4,26 @@ extern crate gdk;
 use gtk::prelude::*;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::cell::Ref;
 use std::string::String;
 use std::fs::File;
 use std::io::prelude::*;
 use std::process::Command;
+use std::vec::Vec;
+use std::fs;
 
 struct Gui {
     // right_column: gtk::Paned,
     headerbar     : gtk::HeaderBar,
-    file_tree     : gtk::ScrolledWindow,
+    file_tree     : gtk::TreeView,
+    file_scroll   : gtk::ScrolledWindow,
     edit_view     : gtk::TextView,
     edit_scroll   : gtk::ScrolledWindow,
     result_view   : gtk::TextView,
     result_scroll : gtk::ScrolledWindow,
     run_button    : gtk::Button,
     save_button   : gtk::Button,
-    filename      : String,
+    filename      : RefCell<String>,
 }
 
 impl Gui {
@@ -27,14 +31,15 @@ impl Gui {
         return Gui {
             // right_column: ,
             headerbar    : gtk::HeaderBar::new(),
-            file_tree    : gtk::ScrolledWindow::new(None, None),
+            file_tree    : gtk::TreeView::new(),
+            file_scroll  : gtk::ScrolledWindow::new(None, None),
             edit_view    : gtk::TextView::new(),
             edit_scroll  : gtk::ScrolledWindow::new(None,None),
             result_view  : gtk::TextView::new(),
             result_scroll: gtk::ScrolledWindow::new(None,None),
             run_button   : gtk::Button::new(),
             save_button  : gtk::Button::new(),
-            filename     : String::from("./src/main.py"),
+            filename     : RefCell::new(String::from("./src/main.py")),
         };
     }
     fn init(&self) {
@@ -66,7 +71,8 @@ impl Gui {
     fn get_text_of_file(&self) -> String{
         let mut ret_string: String = String::new();
 
-        match File::open(&self.filename) {
+        let filename = self.filename.borrow().clone();
+        match File::open(filename) {
             Ok(mut file) => { let _ = file.read_to_string(&mut ret_string); }
             Err(why) => { panic!(why.to_string()) }
         }
@@ -85,7 +91,7 @@ impl Gui {
         }
 
         let buf = self.edit_view.get_buffer().unwrap();
-        let fil = self.filename.clone();
+        let fil = self.filename.borrow().clone();
         let save_button_ref = Rc::new(SaveButtonWrap {
             refs : RefCell::new(SaveButton {
                 textbuffer : buf,
@@ -96,6 +102,7 @@ impl Gui {
             let refs_tmp = save_button_ref.clone();
             self.save_button.connect_clicked(move |_| {
                 let refs = refs_tmp.refs.borrow();
+                println!("save to {}", refs.filename);
                 match File::create(&refs.filename) {
                     Ok(mut file) => {
                         let _ = file.write_all(refs.textbuffer.get_text(
@@ -160,9 +167,89 @@ impl Gui {
         // return self.headerbar;
     }
 
+    fn get_new_column(title: &str, column_num: i32) -> gtk::TreeViewColumn {
+        let column   = gtk::TreeViewColumn::new();
+        column.set_title(title);
+
+        let cell = gtk::CellRendererText::new();
+
+        column.pack_start(&cell, true);
+        column.add_attribute(&cell, "text", column_num as i32);
+
+        return column;
+    }
+
+    fn get_file_name(filepath: &String) -> String  {
+        let mut splited: Vec<&str> = filepath.split("/").collect();
+        return splited.pop().unwrap().to_string() as String;
+    }
+
+    fn set_file_tree_store(dir: String, iter: Option<&gtk::TreeIter>, store: &gtk::TreeStore) {
+        let dir_iter = match iter {
+            Some(iter_tmp) => { store.insert_with_values(Some(&iter_tmp), None, &[0], &[&Gui::get_file_name(&dir)]) },
+            None => { store.insert_with_values(None, None, &[0], &[&Gui::get_file_name(&dir)]) },
+        };
+        if let Ok(paths) =  fs::read_dir(dir) {
+            for path in paths {
+                let pathbuf = path.unwrap().path();
+                let filename = String::from(pathbuf.to_str().unwrap());
+                if !pathbuf.is_file() {
+                    Gui::set_file_tree_store(filename.clone(), Some(&dir_iter), &store);
+                }else{
+                    let _ = store.insert_with_values(Some(&dir_iter), None, &[0], &[&Gui::get_file_name(&filename)]);
+                }
+            }
+        }
+    }
+
+    fn get_fullpath(treemodel: gtk::TreeModel, treepath: &mut gtk::TreePath) -> String {
+        let iter  = treemodel.get_iter(&treepath).unwrap();
+        let value = treemodel.get_value(&iter, 0).get::<String>().unwrap();
+        treepath.up();
+        if treepath.get_depth() > 0 {
+            let downpath = Gui::get_fullpath(treemodel, treepath);
+            return format!("{}/{}", downpath, value);
+        }
+        return value;
+    }
+
     pub fn set_file_tree(&self) {
-        // self.file_tree = gtk::ScrolledWindow::new(None, None);
-        // return self.file_tree
+        let column_types   = [gtk::Type::String];
+        let file_store = gtk::TreeStore::new(&column_types);
+
+        let file_column_num  = 0;
+
+        let file_column  = Gui::get_new_column("Files", file_column_num);
+
+        self.file_tree.append_column(&file_column);
+        struct FileTree {
+            fli: String,
+        }
+        struct FileTreeWrap {
+            refs : RefCell<String>,
+        }
+
+        let file_tree_ref = Rc::new(FileTreeWrap{
+            refs : self.filename.clone(),
+        });
+        {
+            let refs_tmp = file_tree_ref.clone();
+            self.file_tree.connect_row_activated(move |treeview, treepath, treeviewcolumn| {
+                let mut refs = refs_tmp.refs.borrow_mut();
+                let mut filename: std::cell::RefMut<&mut String> = std::cell::RefMut::map(refs, |t| &mut t);
+                // *filename = &mut String::from("asd");
+                let model = treeview.get_model().unwrap();
+                let iter = model.get_iter(&treepath).unwrap();
+                println!("{}", Gui::get_fullpath(model, &mut treepath.clone()));
+            });
+        }
+        // any init process
+
+        self.file_tree.set_model(Some(&file_store));
+
+        Gui::set_file_tree_store(String::from("./src"), None, &file_store);
+
+        self.file_scroll.add(&self.file_tree);
     }
 
     pub fn set_result_view(&self) {
@@ -227,7 +314,7 @@ fn main() {
         gtk::prelude::Inhibit(false)
     });
 
-    two_column.pack1(&gui.file_tree,     true, false);
+    two_column.pack1(&gui.file_scroll,     true, false);
     two_column.pack2(&right_column,        true, false);
 
     right_column.pack1(&gui.edit_scroll,   true, false);
