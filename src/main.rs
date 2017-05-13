@@ -11,6 +11,7 @@ use std::io::prelude::*;
 use std::process::Command;
 use std::vec::Vec;
 use std::fs;
+use std::sync::Arc;
 
 struct Gui {
     // right_column: gtk::Paned,
@@ -21,8 +22,8 @@ struct Gui {
     edit_scroll   : gtk::ScrolledWindow,
     result_view   : gtk::TextView,
     result_scroll : gtk::ScrolledWindow,
-    run_button    : gtk::Button,
-    save_button   : gtk::Button,
+    run_button    : RefCell<gtk::Button>,
+    save_button   : RefCell<gtk::Button>,
     filename      : RefCell<String>,
 }
 
@@ -37,16 +38,16 @@ impl Gui {
             edit_scroll  : gtk::ScrolledWindow::new(None,None),
             result_view  : gtk::TextView::new(),
             result_scroll: gtk::ScrolledWindow::new(None,None),
-            run_button   : gtk::Button::new(),
-            save_button  : gtk::Button::new(),
+            run_button   : RefCell::new(gtk::Button::new()),
+            save_button  : RefCell::new(gtk::Button::new()),
             filename     : RefCell::new(String::from("./src/main.py")),
         };
     }
-    fn init(&self) {
+    fn init(&mut self) {
         self.set_run_button();
         self.set_save_button();
         self.set_header();
-        self.set_file_tree();
+        // self.set_file_tree();
         self.set_edit_view();
         self.set_result_view();
     }
@@ -68,10 +69,9 @@ impl Gui {
         return cmd_out;
     }
 
-    fn get_text_of_file(&self) -> String{
+    fn get_text_of_file(filename: &String) -> String{
         let mut ret_string: String = String::new();
 
-        let filename = self.filename.borrow().clone();
         match File::open(filename) {
             Ok(mut file) => { let _ = file.read_to_string(&mut ret_string); }
             Err(why) => { panic!(why.to_string()) }
@@ -79,47 +79,46 @@ impl Gui {
 
         return ret_string;
     }
-    fn set_save_button(&self) {
-        self.save_button.set_label("Save");
-
+    fn set_save_button(&mut self) {
+        self.save_button.get_mut().set_label("Save");
         struct SaveButton {
             textbuffer : gtk::TextBuffer,
-            filename   : std::string::String,
         }
         struct SaveButtonWrap {
             refs : RefCell<SaveButton>,
         }
 
         let buf = self.edit_view.get_buffer().unwrap();
-        let fil = self.filename.borrow().clone();
         let save_button_ref = Rc::new(SaveButtonWrap {
             refs : RefCell::new(SaveButton {
                 textbuffer : buf,
-                filename   : fil,
             })
         });
         {
+            let mut_filename= &mut self.filename as *mut RefCell<String>;
             let refs_tmp = save_button_ref.clone();
-            self.save_button.connect_clicked(move |_| {
+            self.save_button.get_mut().connect_clicked(move |_| {
                 let refs = refs_tmp.refs.borrow();
-                println!("save to {}", refs.filename);
-                match File::create(&refs.filename) {
-                    Ok(mut file) => {
-                        let _ = file.write_all(refs.textbuffer.get_text(
-                                &refs.textbuffer.get_start_iter(),
-                                &refs.textbuffer.get_end_iter(),
-                                false)
-                            .unwrap()
-                            .as_bytes());
+                let mut filename_clone = mut_filename.clone();
+                unsafe {
+                    match File::create(&format!("./{}", (*filename_clone).get_mut())) {
+                        Ok(mut file) => {
+                            let _ = file.write_all(refs.textbuffer.get_text(
+                                    &refs.textbuffer.get_start_iter(),
+                                    &refs.textbuffer.get_end_iter(),
+                                    false)
+                                .unwrap()
+                                .as_bytes());
+                        }
+                        Err(why)     => { panic!(why.to_string()) }
                     }
-                    Err(why)     => { panic!(why.to_string()) }
                 }
             });
         }
     }
 
-    fn set_run_button(&self) {
-        self.run_button.set_label("Run");
+    fn set_run_button(&mut self) {
+        self.run_button.get_mut().set_label("Run");
 
         struct RunButton {
             textbuffer : gtk::TextBuffer,
@@ -135,36 +134,41 @@ impl Gui {
             })
         });
         {
+            let mut_filename= &mut self.filename as *mut RefCell<String>;
             let refs_tmp = run_button_ref.clone();
-            self.run_button.connect_clicked(move |_| {
+            self.run_button.get_mut().connect_clicked(move |_| {
+                let mut filename_clone = mut_filename.clone();
                 let refs = refs_tmp.refs.borrow();
-                let output = if cfg!(target_os = "windows") {
-                    Command::new("cmd")
-                        .args(&["/C", &format!("bin/Python36/python {}\\src\\main.py", Gui::get_pwd())])
-                        .output()
-                        .expect("failed to execute process")
-                } else {
-                    Command::new("sh")
-                        .arg("-c")
-                        .arg(format!("python {}/src/main.py", Gui::get_pwd()))
-                        .output()
-                        .expect("failed to execute process")
-                };
 
-                let cmd_out = String::from_utf8_lossy(&output.stdout);
-                let cmd_err = String::from_utf8_lossy(&output.stderr);
-                // println!("cmd: {}", format!("python {}/src/main.py", Gui::get_pwd()));
-                refs.textbuffer.set_text(
-                    &format!("{}{}", &cmd_out, &cmd_err)
-                    );
+                unsafe {
+                    let output = if cfg!(target_os = "windows") {
+                        Command::new("cmd")
+                            .args(&["/C", &format!("bin/Python36/python {}/{}", Gui::get_pwd(), *(*filename_clone).borrow())])
+                            .output()
+                            .expect("failed to execute process")
+                    } else {
+                        Command::new("sh")
+                            .arg("-c")
+                            .arg(format!("python {}/{}", Gui::get_pwd(), *(*filename_clone).borrow()))
+                            .output()
+                            .expect("failed to execute process")
+                    };
+                    let cmd_out = String::from_utf8_lossy(&output.stdout);
+                    let cmd_err = String::from_utf8_lossy(&output.stderr);
+                    refs.textbuffer.set_text(
+                        &format!("{}{}", &cmd_out, &cmd_err)
+                        );
+                }
             });
         }
     }
 
-    pub fn set_header(&self) {
-        self.headerbar.pack_start(&self.run_button);
-        self.headerbar.pack_start(&self.save_button);
-        // return self.headerbar;
+    pub fn set_header(&mut self) {
+        unsafe{
+            self.headerbar.pack_start(&(*self.run_button.get_mut()));
+            self.headerbar.pack_start(&(*self.save_button.get_mut()));
+            // return self.headerbar;
+        }
     }
 
     fn get_new_column(title: &str, column_num: i32) -> gtk::TreeViewColumn {
@@ -213,7 +217,8 @@ impl Gui {
         return value;
     }
 
-    pub fn set_file_tree(&self) {
+    // pub fn set_file_tree(&self) {
+    pub fn set_file_tree(&mut self) {
         let column_types   = [gtk::Type::String];
         let file_store = gtk::TreeStore::new(&column_types);
 
@@ -222,33 +227,40 @@ impl Gui {
         let file_column  = Gui::get_new_column("Files", file_column_num);
 
         self.file_tree.append_column(&file_column);
-        struct FileTree {
-            fli: String,
-        }
-        struct FileTreeWrap {
-            refs : RefCell<String>,
-        }
-
-        let file_tree_ref = Rc::new(FileTreeWrap{
-            refs : self.filename.clone(),
-        });
-        {
-            let refs_tmp = file_tree_ref.clone();
-            self.file_tree.connect_row_activated(move |treeview, treepath, treeviewcolumn| {
-                let mut refs = refs_tmp.refs.borrow_mut();
-                let mut filename: std::cell::RefMut<&mut String> = std::cell::RefMut::map(refs, |t| &mut t);
-                // *filename = &mut String::from("asd");
-                let model = treeview.get_model().unwrap();
-                let iter = model.get_iter(&treepath).unwrap();
-                println!("{}", Gui::get_fullpath(model, &mut treepath.clone()));
-            });
-        }
-        // any init process
-
         self.file_tree.set_model(Some(&file_store));
 
         Gui::set_file_tree_store(String::from("./src"), None, &file_store);
 
+        struct FileTree {
+            textbuffer : gtk::TextBuffer,
+        }
+        struct FileTreeWrap{
+            refs : RefCell<FileTree>,
+        }
+
+        let buf = self.edit_view.get_buffer().unwrap();
+        let file_tree_ref = Rc::new(FileTreeWrap{
+            refs : RefCell::new(FileTree{
+                textbuffer : buf,
+            })
+        });
+        {
+            let mut_filename = &mut self.filename as *mut RefCell<String>;
+            let refs_tmp = file_tree_ref.clone();
+            self.file_tree.connect_row_activated(move |treeview, treepath, treeviewcolumn| {
+                let mut filename_clone = mut_filename.clone();
+                let refs = refs_tmp.refs.borrow();
+
+                let model = treeview.get_model().unwrap();
+                unsafe {
+                    *(*filename_clone).get_mut() = format!("{}", Gui::get_fullpath(model, &mut treepath.clone()));
+                    // (*filename_clone).get_mut() == 1;
+                    refs.textbuffer.set_text(
+                        &Gui::get_text_of_file((*filename_clone).get_mut())
+                        );
+                }
+            });
+        }
         self.file_scroll.add(&self.file_tree);
     }
 
@@ -257,36 +269,27 @@ impl Gui {
         self.result_scroll.add(&self.result_view);
     }
 
-    pub fn set_edit_view(&self) {
-        self.edit_view.get_buffer().unwrap().set_text(&self.get_text_of_file());
-        struct EditView {
-            run_button  : gtk::Button,
-            save_button : gtk::Button,
-        }
-        struct EditViewWrap {
-            refs : RefCell<EditView>,
-        }
-
-        let edit_view_ref = Rc::new(EditViewWrap {
-            refs : RefCell::new(EditView {
-                run_button  : self.run_button.clone(),
-                save_button : self.save_button.clone(),
-            })
-        });
+    pub fn set_edit_view(&mut self) {
+        self.edit_view.get_buffer().unwrap().set_text(&Gui::get_text_of_file(&self.filename.borrow().clone()));
         {
-            let refs_tmp = edit_view_ref.clone();
+            let mut_rbtn = &mut self.run_button  as *mut RefCell<gtk::Button>;
+            let mut_sbtn = &mut self.save_button as *mut RefCell<gtk::Button>;
             self.edit_view.connect_key_press_event(move |_,event_key| {
-                let refs = refs_tmp.refs.borrow();
+                let mut rbtn_clone = mut_rbtn.clone();
+                let mut sbtn_clone = mut_sbtn.clone();
+
                 // ctrl(4)が他のキーと一緒に押されている
                 if event_key.get_state().bits() == 4 {
-                    match event_key.get_keyval() as u32 {
-                        114 => { // r button
-                            refs.run_button.clicked();
+                    unsafe {
+                        match event_key.get_keyval() as u32 {
+                            114 => { // r button
+                                (*rbtn_clone).borrow().clicked();
+                            }
+                            115 => { // s button
+                                (*sbtn_clone).borrow().clicked();
+                            }
+                            key => { println!("{}", key) }
                         }
-                        115 => { // s button
-                            refs.save_button.clicked();
-                        }
-                        key => { println!("{}", key) }
                     }
                 }
                 return gtk::prelude::Inhibit(false);
@@ -300,8 +303,9 @@ fn main() {
     gtk::init()
         .expect("Failed to initialize GTK");
 
-    let gui = Gui::new();
+    let mut gui = Gui::new();
     gui.init();
+    gui.set_file_tree();
 
     let mut main_window = gtk::Window::new(gtk::WindowType::Toplevel);
     let two_column    = gtk::Paned::new(gtk::Orientation::Horizontal);
