@@ -2,7 +2,9 @@
 name = "easyIDEP"
 version = "0.1.0"
 dependencies = [
+ "cairo-sys-rs 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "gdk 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "glib-sys 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "gtk 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]

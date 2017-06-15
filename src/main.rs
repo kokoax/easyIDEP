@@ -40,17 +40,18 @@ impl Gui {
             result_scroll: gtk::ScrolledWindow::new(None,None),
             run_button   : RefCell::new(gtk::Button::new()),
             save_button  : RefCell::new(gtk::Button::new()),
-            filename     : RefCell::new(String::from("./src/main.py")),
+            filename     : RefCell::new(String::from("src/main.py")),
         };
     }
     fn init(&mut self) {
         self.set_run_button();
         self.set_save_button();
         self.set_header();
-        // self.set_file_tree();
+        self.set_file_tree();
         self.set_edit_view();
         self.set_result_view();
     }
+
     fn get_pwd() -> String {
         let output = if cfg!(target_os = "windows") {
             Command::new("cmd")
@@ -79,6 +80,7 @@ impl Gui {
 
         return ret_string;
     }
+
     fn set_save_button(&mut self) {
         self.save_button.get_mut().set_label("Save");
         struct SaveButton {
@@ -167,6 +169,7 @@ impl Gui {
         unsafe{
             self.headerbar.pack_start(&(*self.run_button.get_mut()));
             self.headerbar.pack_start(&(*self.save_button.get_mut()));
+            self.headerbar.set_show_close_button(true);
             // return self.headerbar;
         }
     }
@@ -305,7 +308,6 @@ fn main() {
 
     let mut gui = Gui::new();
     gui.init();
-    gui.set_file_tree();
 
     let mut main_window = gtk::Window::new(gtk::WindowType::Toplevel);
     let two_column    = gtk::Paned::new(gtk::Orientation::Horizontal);
