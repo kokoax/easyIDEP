@@ -1,5 +1,6 @@
 extern crate gtk;
 extern crate gdk;
+extern crate regex;
 
 use gtk::prelude::*;
 use std::rc::Rc;
@@ -12,6 +13,7 @@ use std::process::Command;
 use std::vec::Vec;
 use std::fs;
 use std::sync::Arc;
+use regex::Regex;
 
 struct Gui {
     // right_column: gtk::Paned,
@@ -188,7 +190,9 @@ impl Gui {
     }
 
     fn get_file_name(filepath: &String) -> String  {
-        let mut splited: Vec<&str> = filepath.split("/").collect();
+        let re = Regex::new (r"/|\\").unwrap();
+        // let mut splited: Vec<&str> = filepath.split("/").collect();
+        let mut splited: Vec<&str> = re.split(filepath).collect();
         return splited.pop().unwrap().to_string() as String;
     }
 
@@ -201,6 +205,7 @@ impl Gui {
             for path in paths {
                 let pathbuf = path.unwrap().path();
                 let filename = String::from(pathbuf.to_str().unwrap());
+                println!("filename: {}", filename);
                 if !pathbuf.is_file() {
                     Gui::set_file_tree_store(filename.clone(), Some(&dir_iter), &store);
                 }else{
@@ -338,8 +343,8 @@ fn main() {
 
     println!("width: {} height: {}", width, height);
 
-    two_column  .set_position(45);
-    right_column.set_position(height-40);
+    two_column  .set_position(150);
+    right_column.set_position(height-150);
 
     gtk::main();
 }
@@ -349,6 +354,6 @@ fn init(main_window: &gtk::Window) {
 
     main_window.set_border_width(10);
     main_window.set_position(gtk::WindowPosition::Center);
-    main_window.set_default_size(350,70);
+    main_window.set_default_size(1200,700);
 }
 
