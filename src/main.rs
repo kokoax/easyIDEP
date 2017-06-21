@@ -1,5 +1,6 @@
 extern crate gtk;
 extern crate gdk;
+extern crate regex;
 
 use gtk::prelude::*;
 use std::rc::Rc;
@@ -12,6 +13,7 @@ use std::process::Command;
 use std::vec::Vec;
 use std::fs;
 use std::sync::Arc;
+use regex::Regex;
 
 struct Gui {
     // right_column: gtk::Paned,
@@ -55,7 +57,8 @@ impl Gui {
     fn get_pwd() -> String {
         let output = if cfg!(target_os = "windows") {
             Command::new("cmd")
-                .args(&["/C", "@cd"])
+                .arg("/C")
+                .arg("@cd")
                 .output()
                 .expect("failed to execute process")
         } else {
@@ -145,7 +148,7 @@ impl Gui {
                 unsafe {
                     let output = if cfg!(target_os = "windows") {
                         Command::new("cmd")
-                            .args(&["/C", &format!("bin/Python36/python {}/{}", Gui::get_pwd(), *(*filename_clone).borrow())])
+                            .args(&["/C", &format!("{}/bin/Python36/python {}/{}", Gui::get_pwd(), Gui::get_pwd(), *(*filename_clone).borrow())])
                             .output()
                             .expect("failed to execute process")
                     } else {
@@ -187,7 +190,9 @@ impl Gui {
     }
 
     fn get_file_name(filepath: &String) -> String  {
-        let mut splited: Vec<&str> = filepath.split("/").collect();
+        let re = Regex::new (r"/|\\").unwrap();
+        // let mut splited: Vec<&str> = filepath.split("/").collect();
+        let mut splited: Vec<&str> = re.split(filepath).collect();
         return splited.pop().unwrap().to_string() as String;
     }
 
@@ -337,8 +342,8 @@ fn main() {
 
     println!("width: {} height: {}", width, height);
 
-    two_column  .set_position(45);
-    right_column.set_position(height-40);
+    two_column  .set_position(150);
+    right_column.set_position(height-150);
 
     gtk::main();
 }
@@ -348,6 +353,6 @@ fn init(main_window: &gtk::Window) {
 
     main_window.set_border_width(10);
     main_window.set_position(gtk::WindowPosition::Center);
-    main_window.set_default_size(350,70);
+    main_window.set_default_size(1200,700);
 }
 
