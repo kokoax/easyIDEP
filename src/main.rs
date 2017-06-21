@@ -145,7 +145,7 @@ impl Gui {
                 unsafe {
                     let output = if cfg!(target_os = "windows") {
                         Command::new("cmd")
-                            .args(&["/C", &format!("bin/Python36/python {}/{}", Gui::get_pwd(), *(*filename_clone).borrow())])
+                            .args(&["/C", &format!("{}/bin/Python36/python {}/{}", Gui::get_pwd(), Gui::get_pwd(), *(*filename_clone).borrow())])
                             .output()
                             .expect("failed to execute process")
                     } else {
