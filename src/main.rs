@@ -205,7 +205,6 @@ impl Gui {
             for path in paths {
                 let pathbuf = path.unwrap().path();
                 let filename = String::from(pathbuf.to_str().unwrap());
-                println!("filename: {}", filename);
                 if !pathbuf.is_file() {
                     Gui::set_file_tree_store(filename.clone(), Some(&dir_iter), &store);
                 }else{
