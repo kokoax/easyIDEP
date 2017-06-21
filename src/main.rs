@@ -52,20 +52,6 @@ impl Gui {
         self.set_result_view();
     }
 
-    fn path_to_dlls() {
-        if cfg!(target_os = "windows") {
-            Command::new("ls")
-                .env("PATH", format!("{}/dlls", Gui::get_pwd()))
-                .spawn()
-                .expect("ls command failed to start");
-        } else {
-            Command::new("ls")
-                .env("PATH", "")
-                .spawn()
-                .expect("failed to execute process");
-        };
-    }
-
     fn get_pwd() -> String {
         let output = if cfg!(target_os = "windows") {
             Command::new("cmd")
@@ -318,8 +304,6 @@ impl Gui {
 }
 
 fn main() {
-    Gui::path_to_dlls();
-
     gtk::init()
         .expect("Failed to initialize GTK");
 
