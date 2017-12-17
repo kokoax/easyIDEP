@@ -16,6 +16,7 @@ use std::fs;
 use std::sync::Arc;
 use regex::Regex;
 use sourceview::LanguageManagerExt;
+use sourceview::ViewExt;
 
 struct Gui {
     // right_column: gtk::Paned,
@@ -284,6 +285,7 @@ impl Gui {
 
     pub fn set_edit_view(&mut self) {
         self.edit_view.get_buffer().unwrap().set_text(&Gui::get_text_of_file(&self.filename.borrow().clone()));
+        self.edit_view.set_auto_indent(true);
         {
             let mut_rbtn = &mut self.run_button  as *mut RefCell<gtk::Button>;
             let mut_sbtn = &mut self.save_button as *mut RefCell<gtk::Button>;

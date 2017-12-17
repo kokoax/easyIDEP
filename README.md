@@ -6,5 +6,5 @@
 - ~~under ./src tree view~~
 - file generate feature
 - file delete feature
-- auto indent on edit view
+- ~~auto indent on edit view~~
 - Indicating of filename in title bar
