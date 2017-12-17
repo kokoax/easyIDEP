@@ -1,6 +1,7 @@
 extern crate gtk;
 extern crate gdk;
 extern crate regex;
+extern crate sourceview;
 
 use gtk::prelude::*;
 use std::rc::Rc;
@@ -14,13 +15,14 @@ use std::vec::Vec;
 use std::fs;
 use std::sync::Arc;
 use regex::Regex;
+use sourceview::LanguageManagerExt;
 
 struct Gui {
     // right_column: gtk::Paned,
     headerbar     : gtk::HeaderBar,
     file_tree     : gtk::TreeView,
     file_scroll   : gtk::ScrolledWindow,
-    edit_view     : gtk::TextView,
+    edit_view     : sourceview::View,
     edit_scroll   : gtk::ScrolledWindow,
     result_view   : gtk::TextView,
     result_scroll : gtk::ScrolledWindow,
@@ -31,12 +33,14 @@ struct Gui {
 
 impl Gui {
     fn new() -> Gui {
+        let lm = sourceview::LanguageManager::new();
+        let lang = lm.get_language("python").unwrap();
         return Gui {
             // right_column: ,
             headerbar    : gtk::HeaderBar::new(),
             file_tree    : gtk::TreeView::new(),
             file_scroll  : gtk::ScrolledWindow::new(None, None),
-            edit_view    : gtk::TextView::new(),
+            edit_view    : sourceview::View::new_with_buffer(&sourceview::Buffer::new_with_language(&lang)),
             edit_scroll  : gtk::ScrolledWindow::new(None,None),
             result_view  : gtk::TextView::new(),
             result_scroll: gtk::ScrolledWindow::new(None,None),
@@ -45,6 +49,7 @@ impl Gui {
             filename     : RefCell::new(String::from("src/main.py")),
         };
     }
+
     fn init(&mut self) {
         self.set_run_button();
         self.set_save_button();
