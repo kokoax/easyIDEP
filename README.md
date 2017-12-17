@@ -5,4 +5,5 @@
 - release of for windows
 - ~~under ./src tree view~~
 - file generate feature
+- file delete feature
 - Indicating of filename in title bar
