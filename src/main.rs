@@ -17,6 +17,7 @@ use std::sync::Arc;
 use regex::Regex;
 use sourceview::LanguageManagerExt;
 use sourceview::ViewExt;
+use gtk::MenuShellExt;
 
 struct Gui {
     // right_column: gtk::Paned,
@@ -273,6 +274,46 @@ impl Gui {
                         &Gui::get_text_of_file((*filename_clone).get_mut())
                         );
                 }
+            });
+        }
+        {
+            self.file_tree.connect_button_press_event(move |_widget, event| {
+                let mut menu = gtk::Menu::new();
+                let mut menu_items = vec![
+                    gtk::MenuItem::new_with_label("New"),
+                    gtk::MenuItem::new_with_label("Open"),
+                    gtk::MenuItem::new_with_label("Delete"),
+                ];
+                for item in menu_items {
+                    menu.append(&item);
+                    item.show();
+                }
+
+                menu.connect_selection_done(move |widget| {
+                    let selected_item = widget.get_active().unwrap();
+                    let label_value = selected_item.get_property("label").unwrap();
+                    let label = label_value.get::<String>().unwrap();
+                    if label == "New" {
+                        // ファイルラーみたいな検索とかできるやつを表示して欲しい
+                        // 名前を入力して保存するとファイルができる
+                        // あわよくばファイルをedit_viewに表示して欲しい
+                        println!("New");
+                    } else if label == "Open" {
+                        // ファイルラーみたいな検索とかできるやつを表示して欲しい
+                        // 指定したファイルをedit_viewに表示する
+                        println!("Open");
+                    } else if label == "Delete" {
+                        // 指定したファイルをシンプルに削除
+                        // 開いていたファイルを削除したらどうしようね
+                        println!("Delete");
+                    }
+                });
+
+                // if right button of mouse pressed
+                if event.get_button() == 3 {
+                    menu.popup_easy(event.get_button(), event.get_time());
+                }
+                gtk::prelude::Inhibit(false)
             });
         }
         self.file_scroll.add(&self.file_tree);
