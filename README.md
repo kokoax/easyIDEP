@@ -3,6 +3,7 @@
 
 # TODO
 - release of for windows
+- install mingw-sourceview
 - ~~under ./src tree view~~
 - file generate feature
 - file delete feature
